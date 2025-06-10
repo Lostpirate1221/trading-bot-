@@ -1,0 +1,63 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Sample historical cryptocurrency price data (date, price)
+data = {
+    'date': pd.date_range(start='2022-01-01', end='2022-01-31'),
+    'price': [100, 110, 120, 130, 140, 135, 130, 125, 120, 110,
+              105, 100, 95, 100, 105, 110, 115, 120, 125, 130,
+              135, 140, 145, 140, 135, 130, 125, 120, 115, 110]
+}
+
+df = pd.DataFrame(data)
+
+# Calculate simple moving averages (SMA) for short and long periods
+short_window = 5
+long_window = 20
+
+df['SMA_short'] = df['price'].rolling(window=short_window).mean()
+df['SMA_long'] = df['price'].rolling(window=long_window).mean()
+
+# Generate buy and sell signals based on SMA crossover strategy
+df['signal'] = 0
+df['signal'][short_window:] = np.where(df['SMA_short'][short_window:] > df['SMA_long'][short_window:], 1, 0)
+df['positions'] = df['signal'].diff()
+
+# Plot the historical prices and moving averages
+plt.figure(figsize=(12, 6))
+plt.plot(df['date'], df['price'], label='Price')
+plt.plot(df['date'], df['SMA_short'], label='Short SMA (5 days)')
+plt.plot(df['date'], df['SMA_long'], label='Long SMA (20 days)')
+plt.plot(df.loc[df['positions'] == 1, 'date'], df['SMA_short'][df['positions'] == 1], '^', markersize=10, color='g', lw=0, label='Buy Signal')
+plt.plot(df.loc[df['positions'] == -1, 'date'], df['SMA_short'][df['positions'] == -1], 'v', markersize=10, color='r', lw=0, label='Sell Signal')
+plt.title('Cryptocurrency Price and SMA Crossover Strategy')
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.legend()
+plt.show()
+
+# Backtesting (simulated trading)
+initial_capital = 1000
+positions = pd.Series(index=df.index, data=np.zeros(len(df)))
+
+for i in range(len(df)):
+    if df['signal'][i] == 1:
+        positions[i] = initial_capital / df['price'][i]
+        initial_capital -= positions[i] * df['price'][i]
+    elif df['signal'][i] == -1:
+        initial_capital += positions[i] * df['price'][i]
+        positions[i] = 0
+
+# Calculate portfolio value over time
+portfolio = positions * df['price']
+portfolio_total = portfolio.cumsum() + initial_capital
+
+# Plot portfolio value over time
+plt.figure(figsize=(12, 6))
+plt.plot(df['date'], portfolio_total, label='Portfolio Value')
+plt.title('Backtesting: Portfolio Value Over Time')
+plt.xlabel('Date')
+plt.ylabel('Portfolio Value ($)')
+plt.legend()
+plt.show()
