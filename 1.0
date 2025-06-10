@@ -1,0 +1,70 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Sample historical cryptocurrency price data (date, price)
+data = {
+    'date': pd.date_range(start='2022-01-01', end='2022-01-31'),
+    'price': [100, 110, 120, 130, 140, 135, 130, 125, 120, 110,
+              105, 100, 95, 100, 105, 110, 115, 120, 125, 130,
+              135, 140, 145, 140, 135, 130, 125, 120, 115, 110]
+}
+
+df = pd.DataFrame(data)
+
+# Calculate Bollinger Bands
+window = 20
+df['SMA'] = df['price'].rolling(window=window).mean()
+df['std_dev'] = df['price'].rolling(window=window).std()
+df['upper_band'] = df['SMA'] + 2 * df['std_dev']
+df['lower_band'] = df['SMA'] - 2 * df['std_dev']
+
+# Generate buy and sell signals based on Bollinger Bands strategy
+df['signal'] = 0
+df['signal'][window:] = np.where(df['price'][window:] < df['lower_band'][window:], 1, 0)  # Buy signal
+df['signal'][window:] = np.where(df['price'][window:] > df['upper_band'][window:], -1, df['signal'][window:])  # Sell signal
+
+# Plot Bollinger Bands and signals
+plt.figure(figsize=(12, 6))
+plt.plot(df['date'], df['price'], label='Price')
+plt.plot(df['date'], df['SMA'], label='SMA (20 days)')
+plt.plot(df['date'], df['upper_band'], label='Upper Band')
+plt.plot(df['date'], df['lower_band'], label='Lower Band')
+plt.plot(df.loc[df['signal'] == 1, 'date'], df['price'][df['signal'] == 1], '^', markersize=10, color='g', lw=0, label='Buy Signal')
+plt.plot(df.loc[df['signal'] == -1, 'date'], df['price'][df['signal'] == -1], 'v', markersize=10, color='r', lw=0, label='Sell Signal')
+plt.title('Bollinger Bands Strategy')
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.legend()
+plt.show()
+
+# Backtesting (simulated trading)
+initial_capital = 1000
+positions = pd.Series(index=df.index, data=np.zeros(len(df)))
+
+risk_per_trade = 0.02  # Risk 2% of capital per trade
+stop_loss = 0.05  # 5% stop-loss
+
+for i in range(len(df)):
+    if df['signal'][i] == 1:
+        risk_amount = initial_capital * risk_per_trade
+        stop_loss_price = df['price'][i] * (1 - stop_loss)
+        position_size = risk_amount / (df['price'][i] - stop_loss_price)
+        positions[i] = position_size
+        initial_capital -= position_size * df['price'][i]
+    elif df['signal'][i] == -1:
+        initial_capital += positions[i] * df['price'][i]
+        positions[i] = 0
+
+# Calculate portfolio value over time
+portfolio = positions * df['price']
+portfolio_total = portfolio.cumsum() + initial_capital
+
+# Plot portfolio value over time
+plt.figure(figsize=(12, 6))
+plt.plot(df['date'], portfolio_total, label='Portfolio Value')
+plt.title('Backtesting: Portfolio Value Over Time')
+plt.xlabel('Date')
+plt.ylabel('Portfolio Value ($)')
+plt.legend()
+plt.show()
